@@ -73,24 +73,25 @@ jobs:
       shell: powershell
       run: |
         # Check if djvu2hocr already exists in repo
-        if (Test-Path "bin\djvu2hocr") {
-          Write-Host "✓ Using djvu2hocr from repository"
-          Write-Host "djvu2hocr script: $(Resolve-Path 'bin\djvu2hocr')"
+        if (Test-Path "bin/djvu2hocr") {
+          Write-Host "Using djvu2hocr from repository"
+          $scriptPath = Resolve-Path "bin/djvu2hocr"
+          Write-Host "djvu2hocr script: $scriptPath"
         } else {
           Write-Host "djvu2hocr not found in repo, downloading from GitHub..."
 
           # Download djvu2hocr script directly from GitHub (archived repository)
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin/djvu2hocr"
 
           # Download required Python modules from lib/ directory
-          New-Item -ItemType Directory -Force -Path "bin\lib"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
+          New-Item -ItemType Directory -Force -Path "bin/lib"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin/lib/cli.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin/lib/hocr.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin/lib/text_zones.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin/lib/ipc.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin/lib/temporary.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin/lib/unicode_support.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin/lib/utils.py"
         }
 
         # Install lxml which is required by djvu2hocr
@@ -133,12 +134,12 @@ jobs:
       shell: powershell
       run: |
         # Create wrapper batch file for djvu2hocr script
-        $scriptPath = (Resolve-Path "bin\djvu2hocr").Path
+        $scriptPath = (Resolve-Path "bin/djvu2hocr").Path
         Write-Host "djvu2hocr script at: $scriptPath"
 
         # Create wrapper batch file
-        "@echo off" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII
-        "python `"$scriptPath`" %*" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII -Append
+        "@echo off" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII
+        "python `"$scriptPath`" %*" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII -Append
 
         Write-Host "djvu2hocr wrapper created"
 
@@ -150,8 +151,8 @@ jobs:
         Write-Host "pdfbeads found at: $pdfbeadsPath"
 
         # Create wrapper batch file
-        "@echo off" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII
-        "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII -Append
+        "@echo off" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII
+        "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII -Append
 
         Write-Host "pdfbeads wrapper created"
 
