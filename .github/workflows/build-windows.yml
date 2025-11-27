@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -79,11 +79,8 @@ jobs:
         Write-Host "djvu2hocr found at: $djvu2hocrPath"
 
         # Create wrapper batch file
-        $batchContent = @"
-@echo off
-python "$djvu2hocrPath" %*
-"@
-        Set-Content -Path "bin\djvu2hocr.bat" -Value $batchContent
+        "@echo off" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII
+        "python `"$djvu2hocrPath`" %*" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII -Append
 
         Write-Host "djvu2hocr wrapper created"
 
@@ -94,11 +91,9 @@ python "$djvu2hocrPath" %*
         $pdfbeadsPath = (Get-Command pdfbeads).Source
         Write-Host "pdfbeads found at: $pdfbeadsPath"
 
-        $batchContent = @"
-@echo off
-ruby "$pdfbeadsPath" %*
-"@
-        Set-Content -Path "bin\pdfbeads.bat" -Value $batchContent
+        # Create wrapper batch file
+        "@echo off" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII
+        "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII -Append
 
         Write-Host "pdfbeads wrapper created"
 
@@ -138,7 +133,7 @@ ruby "$pdfbeadsPath" %*
         }
 
     - name: Upload executable as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: djvu2pdf-windows
         path: dist/djvu2pdf.exe
