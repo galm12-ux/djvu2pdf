@@ -127,6 +127,9 @@ jobs:
 
         echo "LibTIFF tools ready"
 
+    - name: Install ImageMagick (required for pdfbeads)
+      run: choco install imagemagick -y
+
     - name: Install pdfbeads
       run: gem install pdfbeads
 
