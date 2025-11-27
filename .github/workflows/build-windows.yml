@@ -29,10 +29,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install ocrodjvu
-
-    - name: Install pdfbeads
-      run: gem install pdfbeads
 
     - name: Download DjVuLibre tools
       shell: powershell
@@ -40,9 +36,12 @@ jobs:
         # Create bin directory
         New-Item -ItemType Directory -Force -Path bin
 
-        # Download DjVuLibre for Windows
+        # Download DjVuLibre for Windows (use direct mirror link)
         Write-Host "Downloading DjVuLibre..."
-        Invoke-WebRequest -Uri "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download" -OutFile "djvulibre.zip"
+        $url = "https://downloads.sourceforge.net/project/djvu/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip"
+        Invoke-WebRequest -Uri $url -OutFile "djvulibre.zip" -UserAgent "Mozilla/5.0"
+
+        Write-Host "Extracting DjVuLibre..."
         Expand-Archive -Path "djvulibre.zip" -DestinationPath "djvulibre" -Force
 
         # Copy required executables
@@ -54,14 +53,40 @@ jobs:
 
         Write-Host "DjVuLibre tools installed"
 
+    - name: Download djvu2hocr script directly
+      shell: powershell
+      run: |
+        # Download djvu2hocr script directly from GitHub
+        Write-Host "Downloading djvu2hocr..."
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/hocr/djvu2hocr" -OutFile "bin\djvu2hocr"
+
+        # Download required Python modules
+        New-Item -ItemType Directory -Force -Path "bin\djvu"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/cli.py" -OutFile "bin\cli.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/hocr.py" -OutFile "bin\hocr.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\text_zones.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/ipc.py" -OutFile "bin\ipc.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/temporary.py" -OutFile "bin\temporary.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\unicode_support.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/utils.py" -OutFile "bin\utils.py"
+
+        # Install lxml which is required
+        pip install lxml
+
+        Write-Host "djvu2hocr downloaded"
+
     - name: Download LibTIFF tools
       shell: powershell
       run: |
-        # Download GnuWin32 LibTIFF
+        # Download GnuWin32 LibTIFF (use direct mirror links)
         Write-Host "Downloading LibTIFF..."
-        Invoke-WebRequest -Uri "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip/download" -OutFile "libtiff-bin.zip"
-        Invoke-WebRequest -Uri "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip/download" -OutFile "libtiff-dep.zip"
+        $binUrl = "https://downloads.sourceforge.net/project/gnuwin32/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip"
+        $depUrl = "https://downloads.sourceforge.net/project/gnuwin32/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip"
 
+        Invoke-WebRequest -Uri $binUrl -OutFile "libtiff-bin.zip" -UserAgent "Mozilla/5.0"
+        Invoke-WebRequest -Uri $depUrl -OutFile "libtiff-dep.zip" -UserAgent "Mozilla/5.0"
+
+        Write-Host "Extracting LibTIFF..."
         Expand-Archive -Path "libtiff-bin.zip" -DestinationPath "libtiff" -Force
         Expand-Archive -Path "libtiff-dep.zip" -DestinationPath "libtiff" -Force
 
@@ -71,23 +96,26 @@ jobs:
 
         Write-Host "LibTIFF tools installed"
 
-    - name: Set up djvu2hocr
+    - name: Install pdfbeads
+      run: gem install pdfbeads
+
+    - name: Set up djvu2hocr wrapper
       shell: powershell
       run: |
-        # Find djvu2hocr from ocrodjvu package
-        $djvu2hocrPath = (Get-Command djvu2hocr).Source
-        Write-Host "djvu2hocr found at: $djvu2hocrPath"
+        # Create wrapper batch file for djvu2hocr script
+        $scriptPath = (Resolve-Path "bin\djvu2hocr").Path
+        Write-Host "djvu2hocr script at: $scriptPath"
 
         # Create wrapper batch file
         "@echo off" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII
-        "python `"$djvu2hocrPath`" %*" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII -Append
+        "python `"$scriptPath`" %*" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII -Append
 
         Write-Host "djvu2hocr wrapper created"
 
     - name: Set up pdfbeads wrapper
       shell: powershell
       run: |
-        # Create wrapper batch file for pdfbeads
+        # Find pdfbeads from Ruby gems
         $pdfbeadsPath = (Get-Command pdfbeads).Source
         Write-Host "pdfbeads found at: $pdfbeadsPath"
 
