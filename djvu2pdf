@@ -66,6 +66,25 @@ djvu2pdf_toc_parser.py < toc.txt > toc.out.txt
 #
 # Generate the final PDF
 #
+if compgen -G "tmp_page_*.tiff" > /dev/null; then
+    page_pairs=()
+    mapfile -t page_tiffs < <(printf '%s\n' tmp_page_*.tiff | sort)
+    for tiff_file in "${page_tiffs[@]}"; do
+        base_name="${tiff_file%.tiff}"
+        html_file="${base_name}.html"
+        if [[ ! -f "$html_file" ]]; then
+            echo "Missing OCR HTML for page $tiff_file" >&2
+            exit 1
+        fi
+        page_pairs+=("${tiff_file}" "${html_file}")
+    done
 
-pdfbeads --toc toc.out.txt -o output.pdf
+    if ! pdfbeads --toc toc.out.txt -o output.pdf "${page_pairs[@]}"; then
+        echo "pdfbeads failed to generate the final PDF" >&2
+        exit 1
+    fi
+else
+    echo "No page TIFF files were generated" >&2
+    exit 1
+fi
 mv output.pdf "$file_out"
