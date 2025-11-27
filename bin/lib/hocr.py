@@ -1,6 +1,6 @@
 # encoding=UTF-8
 
-# Copyright © 2008-2016 Jakub Wilk <jwilk@jwilk.net>
+# Copyright © 2008-2018 Jakub Wilk <jwilk@jwilk.net>
 #
 # This file is part of ocrodjvu.
 #
@@ -17,18 +17,19 @@
 Process hOCR documents.
 
 The hOCR format specification:
-https://docs.google.com/Doc?id=dfxcv4vc_67g844kf
+http://kba.github.io/hocr-spec/1.2/
 '''
 
 import functools
 import re
+import six
 
 from . import utils
 
 try:
     from lxml import etree
 except ImportError as ex:
-    utils.enhance_import_error(ex, 'lxml', 'python-lxml', 'http://lxml.de/')
+    utils.enhance_import_error(ex, 'lxml', 'python-lxml', 'https://lxml.de/')
     raise
 
 from . import errors
@@ -68,7 +69,7 @@ _djvu_zone_to_hocr = {
     const.TEXT_ZONE_LINE: ('span', 'ocrx_line'),
     const.TEXT_ZONE_WORD: ('span', 'ocrx_word'),
 }
-djvu2hocr_capabilities = list(sorted(cls for tag, cls in _djvu_zone_to_hocr.itervalues()))
+djvu2hocr_capabilities = list(sorted(cls for tag, cls in _djvu_zone_to_hocr.values()))
 djvu_zone_to_hocr = _djvu_zone_to_hocr.__getitem__
 del _djvu_zone_to_hocr
 
@@ -121,13 +122,13 @@ def _apply_bboxes(djvu_class, bbox_source, text, settings, page_size):
         # Tesseract ≥ 3.0 sometimes returns series of “empty” words. Let's
         # ignore those.
         return []
-    if isinstance(bbox_source, basestring):
+    if isinstance(bbox_source, str):        ## 2to3: was basestring
         # bboxes from plain old hOCR property
         m = bboxes_re.search(bbox_source)
         if not m:
             return [text]
         coordinates = (int(x) for x in m.group(1).replace(',', ' ').split())
-        coordinates = zip(coordinates, coordinates, coordinates, coordinates)
+        coordinates = list(zip(coordinates, coordinates, coordinates, coordinates))
     else:
         # bboxes from an iterator
         coordinates = []
@@ -143,16 +144,15 @@ def _apply_bboxes(djvu_class, bbox_source, text, settings, page_size):
             coordinates += [bbox]
     if len(coordinates) == len(text):
         pass  # OK
+    elif 0 < len(coordinates) - len(text) <= trailing_whitespace_len:
+        # Cuneiform ≥ 0.9 provides bounding boxes for some whitespace characters.
+        # Also, a newline character can appear at the end of line.
+        del coordinates[len(text):]
+    elif not settings.cuneiform and not embedded_eol and len(coordinates) == len(text) + 1:
+        # OCRopus produces weird hOCR output if line ends with a hyphen.
+        del coordinates[-1]
     else:
-        if 0 < len(coordinates) - len(text) <= trailing_whitespace_len:
-            # Cuneiform ≥ 0.9 provides bounding boxes for some whitespace characters.
-            # Also, a newline character can appear at the end of line.
-            del coordinates[len(text):]
-        elif not settings.cuneiform and not embedded_eol and len(coordinates) == len(text) + 1:
-            # OCRopus produces weird hOCR output if line ends with a hyphen.
-            del coordinates[-1]
-        else:
-            raise errors.MalformedHocr("number of bboxes doesn't match text length")
+        raise errors.MalformedHocr("number of bboxes doesn't match text length")
     assert len(coordinates) == len(text)
     if djvu_class > const.TEXT_ZONE_WORD:
         # Split words
@@ -165,7 +165,7 @@ def _apply_bboxes(djvu_class, bbox_source, text, settings, page_size):
                 i = j
                 continue
             bbox = text_zones.BBox()
-            for k in xrange(i, j):
+            for k in range(i, j):
                 if settings.cuneiform and coordinates[k] == (-1, -1, -1, -1):
                     raise errors.MalformedHocr("missing bbox for non-whitespace character")
                 bbox.update(text_zones.BBox(*coordinates[k]))
@@ -176,7 +176,7 @@ def _apply_bboxes(djvu_class, bbox_source, text, settings, page_size):
             else:
                 last_word += [
                     text_zones.Zone(type=const.TEXT_ZONE_CHARACTER, bbox=(x0, y0, x1, y1), children=[ch])
-                    for k in xrange(i, j)
+                    for k in range(i, j)
                     for (x0, y0, x1, y1), ch in [(coordinates[k], text[k])]
                 ]
             i = j
@@ -201,7 +201,7 @@ def _scan(node, settings, page_size=None):
                 result += [child.tail]
         return result
 
-    if not isinstance(node.tag, basestring) or node.tag == 'script':
+    if not isinstance(node.tag, str) or node.tag == 'script': ## 2to3: was basestring
         # Ignore non-elements.
         return []
 
@@ -264,7 +264,7 @@ def _scan(node, settings, page_size=None):
         return empty
 
     for child in children:
-        if isinstance(child, basestring):
+        if isinstance(child, six.string_types):  ## 2to3: was basestring
             has_string = True
             if child and not child.isspace():
                 has_nonempty_string = True
@@ -291,7 +291,7 @@ def _scan(node, settings, page_size=None):
                 if isinstance(child, text_zones.Zone):
                     bbox.update(child.bbox)
         if djvu_class >= const.TEXT_ZONE_LINE:
-            if isinstance(children[-1], basestring) and children[-1].isspace():
+            if isinstance(children[-1], str) and children[-1].isspace():  ## 2to3: was basestring
                 del children[-1]
 
     if djvu_class <= const.TEXT_ZONE_WORD:
@@ -302,7 +302,7 @@ def _scan(node, settings, page_size=None):
                 raise errors.MalformedHocr("zone without bounding box information")
             text = ''.join(children)
             children = _apply_bboxes(djvu_class, settings.bbox_data or title, text, settings, page_size)
-            if len(children) == 1 and isinstance(children[0], basestring):
+            if len(children) == 1 and isinstance(children[0], six.string_types):  ## 2to3: was basestring
                 result = text_zones.Zone(type=const.TEXT_ZONE_CHARACTER, bbox=bbox, children=children)
                 # We return TEXT_ZONE_CHARACTER even it was a word according to hOCR.
                 # Words need to be regrouped anyway.
@@ -325,7 +325,7 @@ def _scan(node, settings, page_size=None):
         children = _apply_bboxes(djvu_class, settings.bbox_data or title, text, settings, page_size)
         if len(children) == 0:
             return empty
-        if isinstance(children[0], basestring):
+        if isinstance(children[0], six.string_types):  ## 2to3: was basestring
             # Get rid of e.g. trailing newlines.
             children[0] = children[0].rstrip()
             has_zone = has_nonchar_zone = has_char_zone = False
@@ -348,7 +348,7 @@ def _scan(node, settings, page_size=None):
 
     if has_zone and has_string:
         assert not has_nonempty_string
-        children = [child for child in children if not isinstance(child, basestring)]
+        children = [child for child in children if not isinstance(child, str)]  ## 2to3: was basestring
         if len(children) == 0:
             return empty
 
@@ -363,7 +363,7 @@ def _scan(node, settings, page_size=None):
             return []
         if len(children) == 1:
             [child] = children
-            if isinstance(child, basestring) and (child == '' or child.isspace()):
+            if isinstance(child, str) and (child == '' or child.isspace()):  ## 2to3: was basestring
                 return []
         raise errors.MalformedHocr("text zone without bounding box information")
 
@@ -372,7 +372,7 @@ def _scan(node, settings, page_size=None):
 def scan(node, settings):
     result = []
     for zone in _scan(node, settings, settings.page_size):
-        if isinstance(zone, basestring):
+        if isinstance(zone, str):  ## 2to3: was basestring
             if zone == '' or zone.isspace():
                 continue
             else:
@@ -424,7 +424,7 @@ def read_document(stream, settings):
         # Ideally, this should never be needed, but some OCR engines produce
         # such broken HTML:
         #  * https://bugs.launchpad.net/cuneiform-linux/+bug/585418
-        #  * https://code.google.com/p/tesseract-ocr/issues/detail?id=690
+        #  * https://groups.google.com/d/topic/tesseract-issues/NlYJA3GNDMI
         #
         # Moreover, the HTML parsers trip over such errors:
         #  * https://bugs.launchpad.net/lxml/+bug/690110
@@ -439,11 +439,10 @@ def read_document(stream, settings):
             root_element = etree.fromstring(contents, etree.HTMLParser(encoding='UTF-8'))
             return etree.ElementTree(root_element)
         del contents
+    elif settings.html5:
+        return html5_support.parse(stream)
     else:
-        if settings.html5:
-            return html5_support.parse(stream)
-        else:
-            return etree.parse(stream, etree.HTMLParser())
+        return etree.parse(stream, etree.HTMLParser())
 
 def extract_text(stream, **kwargs):
     '''

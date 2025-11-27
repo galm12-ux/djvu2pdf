@@ -65,6 +65,8 @@ class BBox(object):
                 return False
         return True
 
+    __bool__ = __nonzero__
+
     def __repr__(self):
         return '{cls}({0!r}, {1!r}, {2!r}, {3!r})'.format(
             *self._coordinates,
@@ -152,8 +154,12 @@ class Zone(object):
         for x in self.bbox:
             assert x is not None
         if xform is None:
-            assert self.type == const.TEXT_ZONE_PAGE, 'the exterior zone is {tp} rather than {pg}'.format(tp=self.type, pg=const.TEXT_ZONE_PAGE)
-            assert self.bbox[:2] == (0, 0), 'top-left page corner is ({0}, {1}) rather than (0, 0)'.format(*self.bbox[:2])
+            assert self.type == const.TEXT_ZONE_PAGE, (
+                'the exterior zone is {tp} rather than {pg}'.format(tp=self.type, pg=const.TEXT_ZONE_PAGE)
+            )
+            assert self.bbox[:2] == (0, 0), (
+                'top-left page corner is ({0}, {1}) rather than (0, 0)'.format(*self.bbox[:2])
+            )
             page_size = self.bbox[2:]
             if (rotation // 90) & 1:
                 xform = decode.AffineTransform((0, 0) + tuple(reversed(page_size)), (0, 0) + page_size)
@@ -204,7 +210,7 @@ def group_words(zones, details, word_break_iterator):
             i = j
             continue
         bbox = BBox()
-        for k in xrange(i, j):
+        for k in range(i, j):
             bbox.update(zones[k].bbox)
         last_word = Zone(type=const.TEXT_ZONE_WORD, bbox=bbox)
         words += [last_word]
@@ -213,7 +219,7 @@ def group_words(zones, details, word_break_iterator):
         else:
             last_word += [
                 Zone(type=const.TEXT_ZONE_CHARACTER, bbox=(x0, y0, x1, y1), children=[ch])
-                for k in xrange(i, j)
+                for k in range(i, j)
                 for (x0, y0, x1, y1), ch in [(zones[k].bbox, text[k])]
             ]
         i = j

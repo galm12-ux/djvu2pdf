@@ -1,6 +1,6 @@
 # encoding=UTF-8
 
-# Copyright © 2016 Jakub Wilk <jwilk@jwilk.net>
+# Copyright © 2016-2019 Jakub Wilk <jwilk@jwilk.net>
 #
 # This file is part of ocrodjvu.
 #
@@ -18,7 +18,7 @@ from __future__ import print_function
 import argparse
 import sys
 
-__version__ = '0.10.2'
+__version__ = '0.12'
 
 class VersionAction(argparse.Action):
     '''

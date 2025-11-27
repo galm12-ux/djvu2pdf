@@ -1,6 +1,6 @@
 # encoding=UTF-8
 
-# Copyright © 2008-2016 Jakub Wilk <jwilk@jwilk.net>
+# Copyright © 2008-2019 Jakub Wilk <jwilk@jwilk.net>
 #
 # This file is part of ocrodjvu.
 #
@@ -15,19 +15,29 @@
 
 '''interprocess communication'''
 
+import errno
 import logging
 import os
 import pipes
 import re
 import signal
+import warnings
+import sys
 
-thread_safe = True
-try:
-    import subprocess32 as subprocess
-except ImportError:  # no coverage
+from . import utils
+
+if sys.version_info < (3, 0):
+    try:
+        import subprocess32 as subprocess
+    except ImportError:  # no coverage
+        import subprocess
+        if os.name == 'posix':
+            exc = RuntimeWarning('the subprocess module is not thread-safe')
+            utils.enhance_import_error(exc, 'subprocess32', 'python-subprocess32', 'https://pypi.org/project/subprocess32/')
+            warnings.warn(exc, category=type(exc))
+            del exc
+else:
     import subprocess
-    if os.name == 'posix':
-        thread_safe = False
 
 # CalledProcessError, CalledProcessInterrupted
 # ============================================
@@ -55,7 +65,7 @@ def get_signal_names():
             del data['SIGCLD']
     except KeyError:  # no coverage
         pass
-    return dict((no, name) for name, no in data.iteritems())
+    return dict((no, name) for name, no in data.items())
 
 CalledProcessError = subprocess.CalledProcessError
 
@@ -87,7 +97,7 @@ class Subprocess(subprocess.Popen):
         lc_ctype = env.get('LC_ALL') or env.get('LC_CTYPE') or env.get('LANG')
         env = dict(
             (k, v)
-            for k, v in env.iteritems()
+            for k, v in env.items()
             if not (k.startswith('LC_') or k in ('LANG', 'LANGUAGE'))
         )
         if lc_ctype:
@@ -110,6 +120,10 @@ class Subprocess(subprocess.Popen):
         try:
             subprocess.Popen.__init__(self, *args, **kwargs)
         except EnvironmentError as ex:
+            suffix = ': ' + repr(self.__command)
+            if ex.strerror.endswith(suffix):
+                # https://bugs.python.org/issue32490
+                ex.strerror = ex.strerror[:-len(suffix)]
             ex.filename = self.__command
             raise
 
@@ -125,6 +139,25 @@ class Subprocess(subprocess.Popen):
 
 PIPE = subprocess.PIPE
 
+# DEVNULL
+# =======
+
+try:
+    DEVNULL = subprocess.DEVNULL
+except AttributeError:
+    DEVNULL = open(os.devnull, 'rw')
+
+# require()
+# =========
+
+def require(command):
+    directories = os.environ['PATH'].split(os.pathsep)
+    for directory in directories:
+        path = os.path.join(directory, command)
+        if os.access(path, os.X_OK):
+            return
+    raise OSError(errno.ENOENT, 'command not found', command)
+
 # logging support
 # ===============
 
@@ -135,8 +168,8 @@ logger = logging.getLogger('ocrodjvu.ipc')
 
 __all__ = [
     'CalledProcessError', 'CalledProcessInterrupted',
-    'Subprocess', 'PIPE',
-    'thread_safe',
+    'Subprocess', 'PIPE', 'DEVNULL',
+    'require',
 ]
 
 # vim:ts=4 sts=4 sw=4 et

@@ -1,6 +1,6 @@
 # encoding=UTF-8
 
-# Copyright © 2008-2016 Jakub Wilk <jwilk@jwilk.net>
+# Copyright © 2008-2018 Jakub Wilk <jwilk@jwilk.net>
 #
 # This file is part of ocrodjvu.
 #
@@ -19,7 +19,8 @@ def get_icu():
     try:
         import icu
     except ImportError as ex:  # no coverage
-        utils.enhance_import_error(ex, 'PyICU', 'python-pyicu', 'https://pypi.python.org/pypi/PyICU')
+        utils.enhance_import_error(ex, 'PyICU', 'python-pyicu', 'https://pypi.org/project/PyICU/')
+        raise
     else:
         return icu
 
