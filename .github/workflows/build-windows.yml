@@ -31,54 +31,37 @@ jobs:
         pip install -r requirements.txt
 
     - name: Download DjVuLibre tools
-      shell: powershell
+      shell: bash
       run: |
         # Create bin directory
-        New-Item -ItemType Directory -Force -Path bin
+        mkdir -p bin
 
-        # Download DjVuLibre for Windows with retry logic
-        Write-Host "Downloading DjVuLibre..."
-        $maxRetries = 3
-        $url = "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download"
+        # Download DjVuLibre for Windows using curl (better redirect handling)
+        echo "Downloading DjVuLibre..."
+        curl -L -o djvulibre.zip \
+          "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download"
 
-        for ($i = 1; $i -le $maxRetries; $i++) {
-            Write-Host "Attempt $i of $maxRetries..."
-            try {
-                # Use -MaximumRedirection to follow SourceForge redirects
-                Invoke-WebRequest -Uri $url -OutFile "djvulibre.zip" -UserAgent "Mozilla/5.0" -MaximumRedirection 5
+        # Verify download
+        fileSize=$(stat -c%s djvulibre.zip 2>/dev/null || stat -f%z djvulibre.zip)
+        echo "Downloaded file size: $fileSize bytes"
 
-                # Verify it's a valid ZIP file
-                $fileSize = (Get-Item "djvulibre.zip").Length
-                Write-Host "Downloaded file size: $fileSize bytes"
+        if [ $fileSize -lt 1000000 ]; then
+            echo "ERROR: Downloaded file too small (expected >1MB)"
+            exit 1
+        fi
 
-                if ($fileSize -lt 1000) {
-                    throw "Downloaded file too small, likely not a valid ZIP"
-                }
-
-                # Try to extract
-                Write-Host "Extracting DjVuLibre..."
-                Expand-Archive -Path "djvulibre.zip" -DestinationPath "djvulibre" -Force
-
-                Write-Host "Download and extraction successful!"
-                break
-            }
-            catch {
-                Write-Host "Attempt $i failed: $_"
-                if ($i -eq $maxRetries) {
-                    throw "Failed to download DjVuLibre after $maxRetries attempts"
-                }
-                Start-Sleep -Seconds 5
-            }
-        }
+        # Extract
+        echo "Extracting DjVuLibre..."
+        unzip -q djvulibre.zip -d djvulibre
 
         # Copy required executables
-        Copy-Item "djvulibre\djvulibre-3.5.28\bin\djvused.exe" -Destination "bin\"
-        Copy-Item "djvulibre\djvulibre-3.5.28\bin\ddjvu.exe" -Destination "bin\"
+        cp djvulibre/djvulibre-3.5.28/bin/djvused.exe bin/
+        cp djvulibre/djvulibre-3.5.28/bin/ddjvu.exe bin/
 
         # Copy required DLLs
-        Copy-Item "djvulibre\djvulibre-3.5.28\bin\*.dll" -Destination "bin\"
+        cp djvulibre/djvulibre-3.5.28/bin/*.dll bin/
 
-        Write-Host "DjVuLibre tools installed"
+        echo "DjVuLibre tools installed"
 
     - name: Download djvu2hocr script directly
       shell: powershell
@@ -103,25 +86,24 @@ jobs:
         Write-Host "djvu2hocr downloaded"
 
     - name: Download LibTIFF tools
-      shell: powershell
+      shell: bash
       run: |
-        # Download GnuWin32 LibTIFF (use direct mirror links)
-        Write-Host "Downloading LibTIFF..."
-        $binUrl = "https://downloads.sourceforge.net/project/gnuwin32/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip"
-        $depUrl = "https://downloads.sourceforge.net/project/gnuwin32/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip"
+        # Download GnuWin32 LibTIFF using curl
+        echo "Downloading LibTIFF..."
+        curl -L -o libtiff-bin.zip \
+          "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip/download"
+        curl -L -o libtiff-dep.zip \
+          "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip/download"
 
-        Invoke-WebRequest -Uri $binUrl -OutFile "libtiff-bin.zip" -UserAgent "Mozilla/5.0"
-        Invoke-WebRequest -Uri $depUrl -OutFile "libtiff-dep.zip" -UserAgent "Mozilla/5.0"
-
-        Write-Host "Extracting LibTIFF..."
-        Expand-Archive -Path "libtiff-bin.zip" -DestinationPath "libtiff" -Force
-        Expand-Archive -Path "libtiff-dep.zip" -DestinationPath "libtiff" -Force
+        echo "Extracting LibTIFF..."
+        unzip -q libtiff-bin.zip -d libtiff
+        unzip -q libtiff-dep.zip -d libtiff
 
         # Copy tiffsplit
-        Copy-Item "libtiff\bin\tiffsplit.exe" -Destination "bin\"
-        Copy-Item "libtiff\bin\*.dll" -Destination "bin\" -Force
+        cp libtiff/bin/tiffsplit.exe bin/
+        cp libtiff/bin/*.dll bin/ 2>/dev/null || true
 
-        Write-Host "LibTIFF tools installed"
+        echo "LibTIFF tools installed"
 
     - name: Install pdfbeads
       run: gem install pdfbeads
