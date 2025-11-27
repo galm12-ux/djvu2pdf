@@ -15,13 +15,18 @@ A tool to convert DjVu files to searchable, compressed PDF with embedded text la
 
 ### For Windows Users
 
-1. Download `djvu2pdf.exe`
+**[📥 Download Here](DOWNLOAD.md)** - Get the latest pre-built executable!
+
+Quick start:
+1. Download `djvu2pdf.exe` from [Actions](../../actions) or [Releases](../../releases)
 2. Double-click to run
 3. Drag a DjVu file or click "Select File"
 4. Click "Convert to PDF"
 5. Done!
 
-See [BUILD_WINDOWS.md](BUILD_WINDOWS.md) for building from source.
+**Automatic builds:** Every commit automatically builds a fresh Windows executable via GitHub Actions.
+
+See [DOWNLOAD.md](DOWNLOAD.md) for download instructions or [BUILD_WINDOWS.md](BUILD_WINDOWS.md) for building from source.
 
 ---
 

@@ -34,7 +34,11 @@ class DjVu2PDFConverter:
         if self.bin_dir and not shell:
             # Prepend bin_dir to first command if it's not an absolute path
             if not os.path.isabs(cmd[0]):
-                cmd[0] = str(self.bin_dir / cmd[0])
+                cmd_name = cmd[0]
+                # On Windows, use .bat extension for djvu2hocr and pdfbeads
+                if sys.platform == "win32" and cmd_name in ["djvu2hocr", "pdfbeads"]:
+                    cmd_name = f"{cmd_name}.bat"
+                cmd[0] = str(self.bin_dir / cmd_name)
 
         return subprocess.run(cmd, shell=shell, check=True, capture_output=True, text=True, **kwargs)
 
