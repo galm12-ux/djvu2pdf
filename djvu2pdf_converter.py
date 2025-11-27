@@ -61,6 +61,19 @@ class DjVu2PDFConverter:
             return self._djvu2hocr_module
 
         if self.bin_dir:
+            # On Windows, add bin directory to PATH for DLL loading
+            if sys.platform == "win32":
+                bin_dir_str = str(self.bin_dir)
+                if bin_dir_str not in os.environ.get('PATH', ''):
+                    os.environ['PATH'] = bin_dir_str + os.pathsep + os.environ.get('PATH', '')
+
+                # Also try to set DLL directory for Python 3.8+
+                if hasattr(os, 'add_dll_directory'):
+                    try:
+                        os.add_dll_directory(bin_dir_str)
+                    except (OSError, FileNotFoundError):
+                        pass
+
             # Add bin/lib to Python path so we can import djvu2hocr modules
             lib_dir = self.bin_dir / 'lib'
             if lib_dir.exists() and str(lib_dir) not in sys.path:
@@ -71,7 +84,8 @@ class DjVu2PDFConverter:
                 from cli import djvu2hocr
                 self._djvu2hocr_module = djvu2hocr
                 return djvu2hocr
-            except ImportError:
+            except ImportError as e:
+                # If import fails, we'll fall back to subprocess
                 pass
 
         return None
