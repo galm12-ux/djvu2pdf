@@ -30,38 +30,44 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Download DjVuLibre tools
+    - name: Setup DjVuLibre tools
       shell: bash
       run: |
-        # Create bin directory
-        mkdir -p bin
+        # Check if binaries already exist in repo
+        if [ -f "bin/djvused.exe" ] && [ -f "bin/ddjvu.exe" ]; then
+          echo "✓ Using DjVuLibre binaries from repository"
+          ls -lh bin/*.exe bin/*.dll 2>/dev/null || true
+        else
+          echo "Binaries not found in repo, downloading from SourceForge..."
+          mkdir -p bin
 
-        # Download DjVuLibre for Windows using curl (better redirect handling)
-        echo "Downloading DjVuLibre..."
-        curl -L -o djvulibre.zip \
-          "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download"
-
-        # Verify download
-        fileSize=$(stat -c%s djvulibre.zip 2>/dev/null || stat -f%z djvulibre.zip)
-        echo "Downloaded file size: $fileSize bytes"
-
-        if [ $fileSize -lt 1000000 ]; then
-            echo "ERROR: Downloaded file too small (expected >1MB)"
+          # Try downloading (may fail with SourceForge)
+          curl -L -o djvulibre.zip \
+            "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download" || {
+            echo "ERROR: Download failed. Please add binaries to bin/ directory in repo."
+            echo "See bin/README.md for instructions."
             exit 1
+          }
+
+          # Verify download
+          fileSize=$(stat -c%s djvulibre.zip 2>/dev/null || stat -f%z djvulibre.zip)
+          echo "Downloaded file size: $fileSize bytes"
+
+          if [ $fileSize -lt 1000000 ]; then
+              echo "ERROR: Downloaded file too small (expected >1MB)"
+              echo "Please add DjVuLibre binaries manually to bin/ directory"
+              exit 1
+          fi
+
+          # Extract
+          echo "Extracting DjVuLibre..."
+          unzip -q djvulibre.zip -d djvulibre
+          cp djvulibre/djvulibre-3.5.28/bin/djvused.exe bin/
+          cp djvulibre/djvulibre-3.5.28/bin/ddjvu.exe bin/
+          cp djvulibre/djvulibre-3.5.28/bin/*.dll bin/
         fi
 
-        # Extract
-        echo "Extracting DjVuLibre..."
-        unzip -q djvulibre.zip -d djvulibre
-
-        # Copy required executables
-        cp djvulibre/djvulibre-3.5.28/bin/djvused.exe bin/
-        cp djvulibre/djvulibre-3.5.28/bin/ddjvu.exe bin/
-
-        # Copy required DLLs
-        cp djvulibre/djvulibre-3.5.28/bin/*.dll bin/
-
-        echo "DjVuLibre tools installed"
+        echo "DjVuLibre tools ready"
 
     - name: Download djvu2hocr script directly
       shell: powershell
@@ -85,25 +91,33 @@ jobs:
 
         Write-Host "djvu2hocr downloaded"
 
-    - name: Download LibTIFF tools
+    - name: Setup LibTIFF tools
       shell: bash
       run: |
-        # Download GnuWin32 LibTIFF using curl
-        echo "Downloading LibTIFF..."
-        curl -L -o libtiff-bin.zip \
-          "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip/download"
-        curl -L -o libtiff-dep.zip \
-          "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip/download"
+        # Check if tiffsplit already exists
+        if [ -f "bin/tiffsplit.exe" ]; then
+          echo "✓ Using LibTIFF binaries from repository"
+        else
+          echo "tiffsplit.exe not found, downloading from SourceForge..."
 
-        echo "Extracting LibTIFF..."
-        unzip -q libtiff-bin.zip -d libtiff
-        unzip -q libtiff-dep.zip -d libtiff
+          # Try downloading
+          curl -L -o libtiff-bin.zip \
+            "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-bin.zip/download" || {
+            echo "ERROR: Download failed. Please add tiffsplit.exe to bin/ directory"
+            exit 1
+          }
+          curl -L -o libtiff-dep.zip \
+            "https://sourceforge.net/projects/gnuwin32/files/tiff/3.8.2-1/tiff-3.8.2-1-dep.zip/download" || true
 
-        # Copy tiffsplit
-        cp libtiff/bin/tiffsplit.exe bin/
-        cp libtiff/bin/*.dll bin/ 2>/dev/null || true
+          echo "Extracting LibTIFF..."
+          unzip -q libtiff-bin.zip -d libtiff
+          unzip -q libtiff-dep.zip -d libtiff 2>/dev/null || true
 
-        echo "LibTIFF tools installed"
+          cp libtiff/bin/tiffsplit.exe bin/
+          cp libtiff/bin/*.dll bin/ 2>/dev/null || true
+        fi
+
+        echo "LibTIFF tools ready"
 
     - name: Install pdfbeads
       run: gem install pdfbeads
