@@ -36,13 +36,40 @@ jobs:
         # Create bin directory
         New-Item -ItemType Directory -Force -Path bin
 
-        # Download DjVuLibre for Windows (use direct mirror link)
+        # Download DjVuLibre for Windows with retry logic
         Write-Host "Downloading DjVuLibre..."
-        $url = "https://downloads.sourceforge.net/project/djvu/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip"
-        Invoke-WebRequest -Uri $url -OutFile "djvulibre.zip" -UserAgent "Mozilla/5.0"
+        $maxRetries = 3
+        $url = "https://sourceforge.net/projects/djvu/files/DjVuLibre_Win32/3.5.28/djvulibre-3.5.28-win.zip/download"
 
-        Write-Host "Extracting DjVuLibre..."
-        Expand-Archive -Path "djvulibre.zip" -DestinationPath "djvulibre" -Force
+        for ($i = 1; $i -le $maxRetries; $i++) {
+            Write-Host "Attempt $i of $maxRetries..."
+            try {
+                # Use -MaximumRedirection to follow SourceForge redirects
+                Invoke-WebRequest -Uri $url -OutFile "djvulibre.zip" -UserAgent "Mozilla/5.0" -MaximumRedirection 5
+
+                # Verify it's a valid ZIP file
+                $fileSize = (Get-Item "djvulibre.zip").Length
+                Write-Host "Downloaded file size: $fileSize bytes"
+
+                if ($fileSize -lt 1000) {
+                    throw "Downloaded file too small, likely not a valid ZIP"
+                }
+
+                # Try to extract
+                Write-Host "Extracting DjVuLibre..."
+                Expand-Archive -Path "djvulibre.zip" -DestinationPath "djvulibre" -Force
+
+                Write-Host "Download and extraction successful!"
+                break
+            }
+            catch {
+                Write-Host "Attempt $i failed: $_"
+                if ($i -eq $maxRetries) {
+                    throw "Failed to download DjVuLibre after $maxRetries attempts"
+                }
+                Start-Sleep -Seconds 5
+            }
+        }
 
         # Copy required executables
         Copy-Item "djvulibre\djvulibre-3.5.28\bin\djvused.exe" -Destination "bin\"
