@@ -127,11 +127,20 @@ jobs:
 
         echo "LibTIFF tools ready"
 
-    - name: Install ImageMagick (required for pdfbeads)
-      run: choco install imagemagick -y
-
-    - name: Install pdfbeads
-      run: gem install pdfbeads
+    - name: Setup pdfbeads
+      shell: bash
+      run: |
+        # Check if pdfbeads is already available
+        if command -v pdfbeads &> /dev/null; then
+          echo "✓ pdfbeads already available"
+          pdfbeads --version || true
+        elif [ -f "bin/pdfbeads" ] || [ -f "bin/pdfbeads.exe" ]; then
+          echo "✓ pdfbeads found in bin directory"
+        else
+          echo "WARNING: pdfbeads not found!"
+          echo "Please add pdfbeads to bin/ directory or install manually"
+          echo "Continuing anyway - build may fail at PDF generation step"
+        fi
 
     - name: Set up djvu2hocr wrapper
       shell: powershell
