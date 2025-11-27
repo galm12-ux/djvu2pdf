@@ -140,14 +140,14 @@ jobs:
       shell: powershell
       run: |
         # Create wrapper batch file for djvu2hocr script
-        $scriptPath = (Resolve-Path "bin/djvu2hocr").Path
-        Write-Host "djvu2hocr script at: $scriptPath"
+        # Use %~dp0 to reference the directory where the batch file is located
+        # This makes it work correctly when PyInstaller extracts to _MEIPASS
 
-        # Create wrapper batch file
+        # Create wrapper batch file with relative path
         "@echo off" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII
-        "python `"$scriptPath`" %*" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII -Append
+        "python `"%~dp0djvu2hocr`" %*" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII -Append
 
-        Write-Host "djvu2hocr wrapper created"
+        Write-Host "djvu2hocr wrapper created with relative path"
 
     - name: Set up pdfbeads wrapper
       shell: powershell
@@ -157,7 +157,8 @@ jobs:
           $pdfbeadsPath = (Get-Command pdfbeads -ErrorAction Stop).Source
           Write-Host "pdfbeads found at: $pdfbeadsPath"
 
-          # Create wrapper batch file
+          # Create wrapper batch file with absolute path to Ruby pdfbeads
+          # pdfbeads is installed in the system, not bundled, so absolute path is needed
           "@echo off" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII
           "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII -Append
 
