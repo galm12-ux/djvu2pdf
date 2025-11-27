@@ -23,13 +23,12 @@ class DjVu2PDFConverter:
         Initialize converter
 
         Args:
-            bin_dir: Directory containing binary tools (djvused, ddjvu, djvu2hocr, etc.)
+            bin_dir: Directory containing binary tools (djvused, ddjvu, etc.)
                     If None, assumes tools are in system PATH
             progress_callback: Function to call with progress updates (message, percent)
         """
         self.bin_dir = bin_dir
         self.progress_callback = progress_callback or (lambda msg, pct: None)
-        self._djvu2hocr_module = None
 
     def _run_command(self, cmd: list, shell: bool = False, **kwargs) -> subprocess.CompletedProcess:
         """Run a command and return the result"""
@@ -37,8 +36,8 @@ class DjVu2PDFConverter:
             # Prepend bin_dir to first command if it's not an absolute path
             if not os.path.isabs(cmd[0]):
                 cmd_name = cmd[0]
-                # On Windows, use .bat extension for djvu2hocr and pdfbeads
-                if sys.platform == "win32" and cmd_name in ["djvu2hocr", "pdfbeads"]:
+                # On Windows, use .bat extension for pdfbeads
+                if sys.platform == "win32" and cmd_name == "pdfbeads":
                     cmd_name = f"{cmd_name}.bat"
                 cmd[0] = str(self.bin_dir / cmd_name)
 
@@ -55,72 +54,106 @@ class DjVu2PDFConverter:
         """Update progress"""
         self.progress_callback(message, percent)
 
-    def _load_djvu2hocr_module(self):
-        """Load the djvu2hocr module if available in bin_dir"""
-        if self._djvu2hocr_module is not None:
-            return self._djvu2hocr_module
-
-        if self.bin_dir:
-            # On Windows, add bin directory to PATH for DLL loading
-            if sys.platform == "win32":
-                bin_dir_str = str(self.bin_dir)
-                if bin_dir_str not in os.environ.get('PATH', ''):
-                    os.environ['PATH'] = bin_dir_str + os.pathsep + os.environ.get('PATH', '')
-
-                # Also try to set DLL directory for Python 3.8+
-                if hasattr(os, 'add_dll_directory'):
-                    try:
-                        os.add_dll_directory(bin_dir_str)
-                    except (OSError, FileNotFoundError):
-                        pass
-
-            # Add bin/lib to Python path so we can import djvu2hocr modules
-            lib_dir = self.bin_dir / 'lib'
-            if lib_dir.exists() and str(lib_dir) not in sys.path:
-                sys.path.insert(0, str(lib_dir))
-
-            # Try to import djvu2hocr CLI module
-            try:
-                from cli import djvu2hocr
-                self._djvu2hocr_module = djvu2hocr
-                return djvu2hocr
-            except ImportError as e:
-                # If import fails, we'll fall back to subprocess
-                pass
-
-        return None
-
-    def _run_djvu2hocr(self, input_file: Path, page: int) -> str:
+    def _extract_text_with_djvused(self, input_file: Path, page: int) -> str:
         """
-        Run djvu2hocr on a specific page
+        Extract text from a page using djvused and generate simple hOCR
 
         Args:
             input_file: Path to DjVu file
             page: Page number (1-indexed)
 
         Returns:
-            hOCR output as string
+            Basic hOCR output as string
         """
-        # Try to use djvu2hocr as a Python module first
-        djvu2hocr_module = self._load_djvu2hocr_module()
+        # Get page size and text content using djvused
+        cmd = ["djvused", "-e", f"select {page}; size; print-txt", str(input_file)]
+        result = self._run_command(cmd)
 
-        if djvu2hocr_module:
-            # Call djvu2hocr.main() directly, capturing stdout
-            old_stdout = sys.stdout
-            old_argv = sys.argv
-            try:
-                sys.stdout = io.StringIO()
-                sys.argv = ['djvu2hocr', str(input_file), '-p', str(page)]
-                djvu2hocr_module.main(sys.argv)
-                return sys.stdout.getvalue()
-            finally:
-                sys.stdout = old_stdout
-                sys.argv = old_argv
-        else:
-            # Fallback to subprocess method
-            cmd = ["djvu2hocr", str(input_file), "-p", str(page)]
-            result = self._run_command(cmd)
-            return result.stdout
+        lines = result.stdout.strip().split('\n')
+        if len(lines) < 2:
+            # No text on this page, return empty hOCR
+            return self._generate_empty_hocr()
+
+        # Parse page size (first two lines: width=X\nheight=Y)
+        try:
+            width = int(lines[0].split('=')[1])
+            height = int(lines[1].split('=')[1])
+        except:
+            width = height = 0
+
+        # Extract all text content (skip size lines)
+        text_content = '\n'.join(lines[2:]) if len(lines) > 2 else ""
+
+        # Parse s-expression and extract text
+        words = self._parse_djvu_text(text_content)
+
+        # Generate simple hOCR HTML
+        return self._generate_hocr(width, height, words)
+
+    def _parse_djvu_text(self, sexpr_text: str) -> list:
+        """
+        Simple s-expression parser to extract text and coordinates
+        Returns list of (text, x0, y0, x1, y1) tuples
+        """
+        words = []
+        # Simple regex to find strings and coordinates in s-expressions
+        # Format: (word x0 y0 x1 y1 "text")
+        import re
+        pattern = r'\(word\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+"([^"]*)"\)'
+        matches = re.findall(pattern, sexpr_text)
+
+        for match in matches:
+            x0, y0, x1, y1, text = match
+            words.append((text, int(x0), int(y0), int(x1), int(y1)))
+
+        return words
+
+    def _generate_hocr(self, width: int, height: int, words: list) -> str:
+        """Generate hOCR HTML from extracted words"""
+        hocr_lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" ',
+            '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+            '<html xmlns="http://www.w3.org/1999/xhtml">',
+            '<head>',
+            '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />',
+            '<meta name="ocr-system" content="djvused" />',
+            '<title>DjVu OCR</title>',
+            '</head>',
+            '<body>',
+            f'<div class="ocr_page" title="bbox 0 0 {width} {height}">',
+        ]
+
+        # Add words
+        for text, x0, y0, x1, y1 in words:
+            # Escape HTML entities
+            text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+            hocr_lines.append(
+                f'<span class="ocr_word" title="bbox {x0} {y0} {x1} {y1}">{text}</span> '
+            )
+
+        hocr_lines.extend([
+            '</div>',
+            '</body>',
+            '</html>'
+        ])
+
+        return '\n'.join(hocr_lines)
+
+    def _generate_empty_hocr(self) -> str:
+        """Generate empty hOCR for pages with no text"""
+        return '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>DjVu OCR</title>
+</head>
+<body>
+<div class="ocr_page" title="bbox 0 0 0 0"></div>
+</body>
+</html>'''
 
     def convert(self, input_file: Path, output_file: Path) -> None:
         """
@@ -189,10 +222,10 @@ class DjVu2PDFConverter:
             page_num = str(i).zfill(strlen_num_pages)
             html_file = tmpdir / f"tmp_page_{page_num}.html"
 
-            # Run djvu2hocr for this page
-            ocr_output = self._run_djvu2hocr(input_file, i)
+            # Extract text using djvused and generate hOCR
+            ocr_output = self._extract_text_with_djvused(input_file, i)
 
-            # Apply sed-like substitution: s/ocrx/ocr/g
+            # Apply sed-like substitution: s/ocrx/ocr/g (for compatibility)
             ocr_content = ocr_output.replace("ocrx", "ocr")
             html_file.write_text(ocr_content, encoding='utf-8')
 

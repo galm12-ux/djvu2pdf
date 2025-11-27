@@ -11,36 +11,25 @@ block_cipher = None
 
 # Collect all necessary data files
 datas = []
-binaries = []
 
 # Add the TOC parser module
 datas.append(('djvu2pdf_toc_parser.py', '.'))
 
 # Add binaries directory if it exists (will contain Windows executables)
-# bin/ should contain: djvused.exe, ddjvu.exe, djvu2hocr.exe, pdfbeads.exe, tiffsplit.exe
+# bin/ should contain: djvused.exe, ddjvu.exe, pdfbeads.exe, tiffsplit.exe, and DLLs
 if os.path.exists('bin'):
     datas.append(('bin', 'bin'))
-
-    # Add DjVuLibre DLLs as binaries (required by python-djvulibre)
-    import glob
-    dll_files = glob.glob('bin/*.dll')
-    for dll in dll_files:
-        binaries.append((dll, 'bin'))
 
 a = Analysis(
     ['djvu2pdf_gui.py'],
     pathex=[],
-    binaries=binaries,
+    binaries=[],
     datas=datas,
     hiddenimports=[
         'tkinter',
         'tkinterdnd2',
         'djvu2pdf_converter',
         'djvu2pdf_toc_parser',
-        'djvu',  # python-djvulibre
-        'djvu.decode',
-        'djvu.const',
-        'djvu.sexpr',
     ],
     hookspath=[],
     hooksconfig={},
