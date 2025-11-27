@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import subprocess
 import re
+import io
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -28,6 +29,7 @@ class DjVu2PDFConverter:
         """
         self.bin_dir = bin_dir
         self.progress_callback = progress_callback or (lambda msg, pct: None)
+        self._djvu2hocr_module = None
 
     def _run_command(self, cmd: list, shell: bool = False, **kwargs) -> subprocess.CompletedProcess:
         """Run a command and return the result"""
@@ -40,11 +42,71 @@ class DjVu2PDFConverter:
                     cmd_name = f"{cmd_name}.bat"
                 cmd[0] = str(self.bin_dir / cmd_name)
 
-        return subprocess.run(cmd, shell=shell, check=True, capture_output=True, text=True, **kwargs)
+        try:
+            return subprocess.run(cmd, shell=shell, check=True, capture_output=True, text=True, **kwargs)
+        except subprocess.CalledProcessError as e:
+            # Provide detailed error message with stderr output
+            error_msg = f"Command failed: {' '.join(str(c) for c in cmd)}\n"
+            if e.stderr:
+                error_msg += f"Error output: {e.stderr}"
+            raise RuntimeError(error_msg) from e
 
     def _update_progress(self, message: str, percent: int):
         """Update progress"""
         self.progress_callback(message, percent)
+
+    def _load_djvu2hocr_module(self):
+        """Load the djvu2hocr module if available in bin_dir"""
+        if self._djvu2hocr_module is not None:
+            return self._djvu2hocr_module
+
+        if self.bin_dir:
+            # Add bin/lib to Python path so we can import djvu2hocr modules
+            lib_dir = self.bin_dir / 'lib'
+            if lib_dir.exists() and str(lib_dir) not in sys.path:
+                sys.path.insert(0, str(lib_dir))
+
+            # Try to import djvu2hocr CLI module
+            try:
+                from cli import djvu2hocr
+                self._djvu2hocr_module = djvu2hocr
+                return djvu2hocr
+            except ImportError:
+                pass
+
+        return None
+
+    def _run_djvu2hocr(self, input_file: Path, page: int) -> str:
+        """
+        Run djvu2hocr on a specific page
+
+        Args:
+            input_file: Path to DjVu file
+            page: Page number (1-indexed)
+
+        Returns:
+            hOCR output as string
+        """
+        # Try to use djvu2hocr as a Python module first
+        djvu2hocr_module = self._load_djvu2hocr_module()
+
+        if djvu2hocr_module:
+            # Call djvu2hocr.main() directly, capturing stdout
+            old_stdout = sys.stdout
+            old_argv = sys.argv
+            try:
+                sys.stdout = io.StringIO()
+                sys.argv = ['djvu2hocr', str(input_file), '-p', str(page)]
+                djvu2hocr_module.main(sys.argv)
+                return sys.stdout.getvalue()
+            finally:
+                sys.stdout = old_stdout
+                sys.argv = old_argv
+        else:
+            # Fallback to subprocess method
+            cmd = ["djvu2hocr", str(input_file), "-p", str(page)]
+            result = self._run_command(cmd)
+            return result.stdout
 
     def convert(self, input_file: Path, output_file: Path) -> None:
         """
@@ -67,7 +129,13 @@ class DjVu2PDFConverter:
 
             try:
                 os.chdir(tmpdir)
-                self._perform_conversion(input_file, output_file, tmpdir)
+
+                # Copy input file to temp directory with ASCII-safe name
+                # This avoids issues with Unicode/special characters in filenames
+                temp_input = tmpdir / "input.djvu"
+                shutil.copy2(input_file, temp_input)
+
+                self._perform_conversion(temp_input, output_file, tmpdir)
             finally:
                 os.chdir(original_dir)
 
@@ -108,11 +176,10 @@ class DjVu2PDFConverter:
             html_file = tmpdir / f"tmp_page_{page_num}.html"
 
             # Run djvu2hocr for this page
-            cmd = ["djvu2hocr", str(input_file), "-p", str(i)]
-            result = self._run_command(cmd)
+            ocr_output = self._run_djvu2hocr(input_file, i)
 
             # Apply sed-like substitution: s/ocrx/ocr/g
-            ocr_content = result.stdout.replace("ocrx", "ocr")
+            ocr_content = ocr_output.replace("ocrx", "ocr")
             html_file.write_text(ocr_content, encoding='utf-8')
 
             # Update progress for OCR extraction
