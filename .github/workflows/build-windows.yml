@@ -130,18 +130,11 @@ jobs:
     - name: Setup pdfbeads
       shell: bash
       run: |
-        # Check if pdfbeads gem file exists in repo
-        if [ -f "pdfbeads-1.1.4.gem" ]; then
-          echo "Installing pdfbeads from gem file..."
-          gem install pdfbeads-1.1.4.gem
-          pdfbeads --version
-        elif command -v pdfbeads &> /dev/null; then
-          echo "✓ pdfbeads already available"
-          pdfbeads --version
-        else
-          echo "WARNING: pdfbeads not found!"
-          echo "Build may fail at PDF generation step"
-        fi
+        # pdfbeads installation is complex on Windows due to RMagick/ImageMagick
+        # Skip for now - will be handled separately
+        echo "Skipping pdfbeads installation (requires ImageMagick dev headers)"
+        echo "The .exe will be built, but PDF conversion may not work without pdfbeads"
+        echo "Note: pdfbeads needs to be installed manually or provided as executable"
 
     - name: Set up djvu2hocr wrapper
       shell: powershell
@@ -159,15 +152,20 @@ jobs:
     - name: Set up pdfbeads wrapper
       shell: powershell
       run: |
-        # Find pdfbeads from Ruby gems
-        $pdfbeadsPath = (Get-Command pdfbeads).Source
-        Write-Host "pdfbeads found at: $pdfbeadsPath"
+        # Try to find pdfbeads if it exists
+        try {
+          $pdfbeadsPath = (Get-Command pdfbeads -ErrorAction Stop).Source
+          Write-Host "pdfbeads found at: $pdfbeadsPath"
 
-        # Create wrapper batch file
-        "@echo off" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII
-        "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII -Append
+          # Create wrapper batch file
+          "@echo off" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII
+          "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII -Append
 
-        Write-Host "pdfbeads wrapper created"
+          Write-Host "pdfbeads wrapper created"
+        } catch {
+          Write-Host "pdfbeads not found - skipping wrapper creation"
+          Write-Host "PDF conversion will not work in the final executable"
+        }
 
     - name: Update converter to use .bat extensions
       shell: powershell
