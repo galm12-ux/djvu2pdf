@@ -1,15 +1,34 @@
 
-# WARNING
+# DjVu to PDF Converter
 
-This script is very fragile. Don't use it unless you know what it
-does!
+A tool to convert DjVu files to searchable, compressed PDF with embedded text layers.
 
+## Windows GUI Version
 
-# About
+**NEW!** A Windows portable application with graphical interface is now available!
+
+- 📦 **Single .exe file** - no installation required
+- 🖱️ **Drag & drop** interface
+- 📊 **Progress tracking** with visual feedback
+- 🔍 **Preserves OCR text layers** using djvu2hocr
+- 📚 **Table of contents** support
+
+### For Windows Users
+
+1. Download `djvu2pdf.exe`
+2. Double-click to run
+3. Drag a DjVu file or click "Select File"
+4. Click "Convert to PDF"
+5. Done!
+
+See [BUILD_WINDOWS.md](BUILD_WINDOWS.md) for building from source.
+
+---
+
+## Original Bash Script
 
 This script generates a compressed PDF from DjVu and tries to include
-text layers from the original DjVu file. I have no idea what happens in
-case there is no embedded text.
+text layers from the original DjVu file.
 
 
 # (nontrivial) Dependencies
