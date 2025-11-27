@@ -10,8 +10,9 @@ def parse_sexp(toc_input, toc_output, indent_str, i):
     ``toc_input[i:]`` is the string to parse, and ``indent_str`` is
     the string of tabulations for our current level in the output
     TOC. The output from ``djvused`` should not include the
-    '(bookmarks' prefix. Anything up until the opening brace is
-    disregarded, as well as anything after its matching closing brace.
+    '(bookmarks' prefix because the caller strips it (including the
+    opening parenthesis) before invoking this function. Anything after
+    its matching closing brace is disregarded.
 
     If the input is badly formatted, weird things will happen.
     """
@@ -78,8 +79,13 @@ if __name__ == '__main__':
     # It's possible that the file does not have a table of contents,
     # in which case we won't read anything at all
     if len(toc_input) > 0:
-        # We must skip the '(bookmarks' prefix as it doesn't fit the
-        # general pattern expected by `parse_sexp`. 
+        prefix = '(bookmarks'
+
+        # Skip the '(bookmarks' prefix entirely, including its opening
+        # parenthesis, before passing the rest to `parse_sexp`.
+        if len(toc_input) <= len(prefix):
+            sys.exit(0)
+
         toc_output = []
-        parse_sexp(toc_input[1:], toc_output, '', 0) 
+        parse_sexp(toc_input[len(prefix):], toc_output, '', 0)
         print('\n'.join(toc_output))
