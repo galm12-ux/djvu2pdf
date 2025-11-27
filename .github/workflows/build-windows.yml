@@ -72,19 +72,19 @@ jobs:
     - name: Download djvu2hocr script directly
       shell: powershell
       run: |
-        # Download djvu2hocr script directly from GitHub (root directory)
+        # Download djvu2hocr script directly from GitHub (archived repository)
         Write-Host "Downloading djvu2hocr..."
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
 
         # Download required Python modules from lib/ directory
         New-Item -ItemType Directory -Force -Path "bin\lib"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
 
         # Install lxml which is required by djvu2hocr
         pip install lxml
