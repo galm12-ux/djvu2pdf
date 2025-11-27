@@ -16,7 +16,7 @@ datas = []
 datas.append(('djvu2pdf_toc_parser.py', '.'))
 
 # Add binaries directory if it exists (will contain Windows executables)
-# bin/ should contain: djvused.exe, ddjvu.exe, djvu2hocr.exe, pdfbeads.exe, tiffsplit.exe
+# bin/ should contain: djvused.exe, ddjvu.exe, pdfbeads.exe, tiffsplit.exe, and DLLs
 if os.path.exists('bin'):
     datas.append(('bin', 'bin'))
 
