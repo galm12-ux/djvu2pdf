@@ -69,27 +69,35 @@ jobs:
 
         echo "DjVuLibre tools ready"
 
-    - name: Download djvu2hocr script directly
+    - name: Setup djvu2hocr
       shell: powershell
       run: |
-        # Download djvu2hocr script directly from GitHub (root directory)
-        Write-Host "Downloading djvu2hocr..."
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
+        # Check if djvu2hocr already exists in repo
+        if (Test-Path "bin/djvu2hocr") {
+          Write-Host "Using djvu2hocr from repository"
+          $scriptPath = Resolve-Path "bin/djvu2hocr"
+          Write-Host "djvu2hocr script: $scriptPath"
+        } else {
+          Write-Host "djvu2hocr not found in repo, downloading from GitHub..."
 
-        # Download required Python modules from lib/ directory
-        New-Item -ItemType Directory -Force -Path "bin\lib"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
+          # Download djvu2hocr script directly from GitHub (archived repository)
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin/djvu2hocr"
+
+          # Download required Python modules from lib/ directory
+          New-Item -ItemType Directory -Force -Path "bin/lib"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin/lib/cli.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin/lib/hocr.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin/lib/text_zones.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin/lib/ipc.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin/lib/temporary.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin/lib/unicode_support.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin/lib/utils.py"
+        }
 
         # Install lxml which is required by djvu2hocr
         pip install lxml
 
-        Write-Host "djvu2hocr downloaded successfully"
+        Write-Host "djvu2hocr ready"
 
     - name: Setup LibTIFF tools
       shell: bash
@@ -119,34 +127,45 @@ jobs:
 
         echo "LibTIFF tools ready"
 
-    - name: Install pdfbeads
-      run: gem install pdfbeads
+    - name: Setup pdfbeads
+      shell: bash
+      run: |
+        # pdfbeads installation is complex on Windows due to RMagick/ImageMagick
+        # Skip for now - will be handled separately
+        echo "Skipping pdfbeads installation (requires ImageMagick dev headers)"
+        echo "The .exe will be built, but PDF conversion may not work without pdfbeads"
+        echo "Note: pdfbeads needs to be installed manually or provided as executable"
 
     - name: Set up djvu2hocr wrapper
       shell: powershell
       run: |
         # Create wrapper batch file for djvu2hocr script
-        $scriptPath = (Resolve-Path "bin\djvu2hocr").Path
+        $scriptPath = (Resolve-Path "bin/djvu2hocr").Path
         Write-Host "djvu2hocr script at: $scriptPath"
 
         # Create wrapper batch file
-        "@echo off" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII
-        "python `"$scriptPath`" %*" | Out-File -FilePath "bin\djvu2hocr.bat" -Encoding ASCII -Append
+        "@echo off" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII
+        "python `"$scriptPath`" %*" | Out-File -FilePath "bin/djvu2hocr.bat" -Encoding ASCII -Append
 
         Write-Host "djvu2hocr wrapper created"
 
     - name: Set up pdfbeads wrapper
       shell: powershell
       run: |
-        # Find pdfbeads from Ruby gems
-        $pdfbeadsPath = (Get-Command pdfbeads).Source
-        Write-Host "pdfbeads found at: $pdfbeadsPath"
+        # Try to find pdfbeads if it exists
+        try {
+          $pdfbeadsPath = (Get-Command pdfbeads -ErrorAction Stop).Source
+          Write-Host "pdfbeads found at: $pdfbeadsPath"
 
-        # Create wrapper batch file
-        "@echo off" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII
-        "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin\pdfbeads.bat" -Encoding ASCII -Append
+          # Create wrapper batch file
+          "@echo off" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII
+          "ruby `"$pdfbeadsPath`" %*" | Out-File -FilePath "bin/pdfbeads.bat" -Encoding ASCII -Append
 
-        Write-Host "pdfbeads wrapper created"
+          Write-Host "pdfbeads wrapper created"
+        } catch {
+          Write-Host "pdfbeads not found - skipping wrapper creation"
+          Write-Host "PDF conversion will not work in the final executable"
+        }
 
     - name: Update converter to use .bat extensions
       shell: powershell
@@ -174,12 +193,12 @@ jobs:
     - name: Verify executable was created
       shell: powershell
       run: |
-        if (Test-Path "dist\djvu2pdf.exe") {
-          Write-Host "✓ Executable created successfully!"
-          $fileSize = (Get-Item "dist\djvu2pdf.exe").Length / 1MB
+        if (Test-Path "dist/djvu2pdf.exe") {
+          Write-Host "Executable created successfully!"
+          $fileSize = (Get-Item "dist/djvu2pdf.exe").Length / 1MB
           Write-Host "File size: $([math]::Round($fileSize, 2)) MB"
         } else {
-          Write-Host "✗ Executable not found!"
+          Write-Host "Executable not found!"
           exit 1
         }
 
