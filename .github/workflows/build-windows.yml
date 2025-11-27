@@ -193,12 +193,12 @@ jobs:
     - name: Verify executable was created
       shell: powershell
       run: |
-        if (Test-Path "dist\djvu2pdf.exe") {
-          Write-Host "✓ Executable created successfully!"
-          $fileSize = (Get-Item "dist\djvu2pdf.exe").Length / 1MB
+        if (Test-Path "dist/djvu2pdf.exe") {
+          Write-Host "Executable created successfully!"
+          $fileSize = (Get-Item "dist/djvu2pdf.exe").Length / 1MB
           Write-Host "File size: $([math]::Round($fileSize, 2)) MB"
         } else {
-          Write-Host "✗ Executable not found!"
+          Write-Host "Executable not found!"
           exit 1
         }
 
