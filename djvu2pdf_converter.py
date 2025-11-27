@@ -13,6 +13,10 @@ import re
 import io
 from pathlib import Path
 from typing import Optional, Callable
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from PIL import Image
+import xml.etree.ElementTree as ET
 
 
 class DjVu2PDFConverter:
@@ -48,6 +52,16 @@ class DjVu2PDFConverter:
             error_msg = f"Command failed: {' '.join(str(c) for c in cmd)}\n"
             if e.stderr:
                 error_msg += f"Error output: {e.stderr}"
+            raise RuntimeError(error_msg) from e
+        except FileNotFoundError as e:
+            # Command executable not found
+            error_msg = f"Command not found: {cmd[0]}\n"
+            error_msg += f"Full command: {' '.join(str(c) for c in cmd)}\n"
+            if self.bin_dir:
+                error_msg += f"Bin directory: {self.bin_dir}\n"
+                error_msg += f"Bin directory exists: {self.bin_dir.exists()}\n"
+                if self.bin_dir.exists():
+                    error_msg += f"Contents: {', '.join(f.name for f in self.bin_dir.iterdir())}"
             raise RuntimeError(error_msg) from e
 
     def _update_progress(self, message: str, percent: int):
@@ -155,6 +169,101 @@ class DjVu2PDFConverter:
 </body>
 </html>'''
 
+    def _create_pdf_with_text_layer(self, page_pairs: list, output_pdf: Path, toc_file: Path):
+        """
+        Create PDF from TIFF images with OCR text layer using reportlab
+
+        Args:
+            page_pairs: List of (tiff_path, html_path) tuples
+            output_pdf: Output PDF file path
+            toc_file: Table of contents file (currently not implemented)
+        """
+        c = canvas.Canvas(str(output_pdf))
+
+        for i in range(0, len(page_pairs), 2):
+            tiff_path = Path(page_pairs[i])
+            html_path = Path(page_pairs[i + 1])
+
+            # Open image to get dimensions
+            with Image.open(tiff_path) as img:
+                width, height = img.size
+
+            # Set page size to match image
+            c.setPageSize((width, height))
+
+            # Draw the image
+            c.drawImage(str(tiff_path), 0, 0, width=width, height=height)
+
+            # Add invisible text layer from hOCR
+            if html_path.exists():
+                self._add_text_layer(c, html_path, height)
+
+            c.showPage()
+
+        c.save()
+
+    def _add_text_layer(self, pdf_canvas, html_path: Path, page_height: int):
+        """
+        Add invisible text layer to PDF page from hOCR HTML
+
+        Args:
+            pdf_canvas: ReportLab canvas object
+            html_path: Path to hOCR HTML file
+            page_height: Height of the page (needed for coordinate conversion)
+        """
+        try:
+            # Parse hOCR HTML
+            tree = ET.parse(str(html_path))
+            root = tree.getroot()
+
+            # Find all word elements
+            # Handle both with and without namespace
+            words = root.findall(".//*[@class='ocr_word']")
+            if not words:
+                # Try with namespace
+                ns = {'html': 'http://www.w3.org/1999/xhtml'}
+                words = root.findall(".//html:*[@class='ocr_word']", ns)
+
+            for word_elem in words:
+                title = word_elem.get('title', '')
+                text = ''.join(word_elem.itertext()).strip()
+
+                if not text or not title:
+                    continue
+
+                # Parse bbox from title attribute
+                # Format: "bbox x0 y0 x1 y1"
+                bbox_match = re.search(r'bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)', title)
+                if not bbox_match:
+                    continue
+
+                x0, y0, x1, y1 = map(int, bbox_match.groups())
+
+                # Convert coordinates (hOCR uses top-left origin, PDF uses bottom-left)
+                pdf_x = x0
+                pdf_y = page_height - y1
+                text_width = x1 - x0
+                text_height = y1 - y0
+
+                # Calculate font size to fit the bbox
+                font_size = text_height * 0.8  # Approximate
+
+                # Add invisible text
+                pdf_canvas.saveState()
+                pdf_canvas.setFillColorRGB(0, 0, 0, alpha=0)  # Invisible
+                pdf_canvas.setFont("Helvetica", font_size)
+
+                # Scale text to fit width
+                text_obj = pdf_canvas.beginText(pdf_x, pdf_y)
+                text_obj.textLine(text)
+                pdf_canvas.drawText(text_obj)
+
+                pdf_canvas.restoreState()
+
+        except Exception as e:
+            # If text layer fails, just skip it (image will still be in PDF)
+            pass
+
     def convert(self, input_file: Path, output_file: Path) -> None:
         """
         Convert DjVu file to PDF
@@ -254,10 +363,10 @@ class DjVu2PDFConverter:
         else:
             toc_output_file.write_text('', encoding='utf-8')
 
-        # Step 6: Generate final PDF with pdfbeads
+        # Step 6: Generate final PDF using Python-based generator
         self._update_progress("Generating PDF...", 95)
 
-        # Build page pairs (tiff, html) for pdfbeads
+        # Build page pairs (tiff, html) for PDF generation
         page_tiffs = sorted(tmpdir.glob("tmp_page_*.tiff"))
         page_pairs = []
 
@@ -271,12 +380,9 @@ class DjVu2PDFConverter:
             raise RuntimeError("No page TIFF files were generated")
 
         output_pdf = tmpdir / "output.pdf"
-        cmd = ["pdfbeads", "--toc", str(toc_output_file), "-o", str(output_pdf)] + page_pairs
 
-        try:
-            self._run_command(cmd)
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"pdfbeads failed to generate the final PDF: {e.stderr}")
+        # Create PDF with text layer using Python (replaces pdfbeads)
+        self._create_pdf_with_text_layer(page_pairs, output_pdf, toc_output_file)
 
         # Step 7: Move output to final destination
         self._update_progress("Finalizing...", 99)
