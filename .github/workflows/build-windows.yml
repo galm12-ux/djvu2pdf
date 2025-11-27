@@ -69,27 +69,34 @@ jobs:
 
         echo "DjVuLibre tools ready"
 
-    - name: Download djvu2hocr script directly
+    - name: Setup djvu2hocr
       shell: powershell
       run: |
-        # Download djvu2hocr script directly from GitHub (archived repository)
-        Write-Host "Downloading djvu2hocr..."
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
+        # Check if djvu2hocr already exists in repo
+        if (Test-Path "bin\djvu2hocr") {
+          Write-Host "✓ Using djvu2hocr from repository"
+          Write-Host "djvu2hocr script: $(Resolve-Path 'bin\djvu2hocr')"
+        } else {
+          Write-Host "djvu2hocr not found in repo, downloading from GitHub..."
 
-        # Download required Python modules from lib/ directory
-        New-Item -ItemType Directory -Force -Path "bin\lib"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
+          # Download djvu2hocr script directly from GitHub (archived repository)
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/djvu2hocr" -OutFile "bin\djvu2hocr"
+
+          # Download required Python modules from lib/ directory
+          New-Item -ItemType Directory -Force -Path "bin\lib"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/cli.py" -OutFile "bin\lib\cli.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/hocr.py" -OutFile "bin\lib\hocr.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/text_zones.py" -OutFile "bin\lib\text_zones.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/ipc.py" -OutFile "bin\lib\ipc.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/temporary.py" -OutFile "bin\lib\temporary.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/unicode_support.py" -OutFile "bin\lib\unicode_support.py"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jwilk-archive/ocrodjvu/master/lib/utils.py" -OutFile "bin\lib\utils.py"
+        }
 
         # Install lxml which is required by djvu2hocr
         pip install lxml
 
-        Write-Host "djvu2hocr downloaded successfully"
+        Write-Host "djvu2hocr ready"
 
     - name: Setup LibTIFF tools
       shell: bash
