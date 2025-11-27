@@ -1,15 +1,15 @@
 
 # WARNING
 
-This is script is very fragile. Don't use it unless you know what it
+This script is very fragile. Don't use it unless you know what it
 does!
 
 
 # About
 
-generates compressed PDF from DjVu and tries to include text layers
-from the original DjVu file. I have no idea what happens in case there
-is no embedded text.
+This script generates a compressed PDF from DjVu and tries to include
+text layers from the original DjVu file. I have no idea what happens in
+case there is no embedded text.
 
 
 # (nontrivial) Dependencies
