@@ -130,16 +130,17 @@ jobs:
     - name: Setup pdfbeads
       shell: bash
       run: |
-        # Check if pdfbeads is already available
-        if command -v pdfbeads &> /dev/null; then
+        # Check if pdfbeads gem file exists in repo
+        if [ -f "pdfbeads-1.1.4.gem" ]; then
+          echo "Installing pdfbeads from gem file..."
+          gem install pdfbeads-1.1.4.gem
+          pdfbeads --version
+        elif command -v pdfbeads &> /dev/null; then
           echo "✓ pdfbeads already available"
-          pdfbeads --version || true
-        elif [ -f "bin/pdfbeads" ] || [ -f "bin/pdfbeads.exe" ]; then
-          echo "✓ pdfbeads found in bin directory"
+          pdfbeads --version
         else
           echo "WARNING: pdfbeads not found!"
-          echo "Please add pdfbeads to bin/ directory or install manually"
-          echo "Continuing anyway - build may fail at PDF generation step"
+          echo "Build may fail at PDF generation step"
         fi
 
     - name: Set up djvu2hocr wrapper
