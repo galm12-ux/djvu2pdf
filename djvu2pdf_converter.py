@@ -67,7 +67,13 @@ class DjVu2PDFConverter:
 
             try:
                 os.chdir(tmpdir)
-                self._perform_conversion(input_file, output_file, tmpdir)
+
+                # Copy input file to temp directory with ASCII-safe name
+                # This avoids issues with Unicode/special characters in filenames
+                temp_input = tmpdir / "input.djvu"
+                shutil.copy2(input_file, temp_input)
+
+                self._perform_conversion(temp_input, output_file, tmpdir)
             finally:
                 os.chdir(original_dir)
 
